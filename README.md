@@ -1,5 +1,5 @@
 # LocalService Hub — Setup Guide
-## 4th Semester Project | PHP + MySQL + HTML/CSS/JS
+## PHP + MySQL + HTML/CSS/JS
 
 ---
 
