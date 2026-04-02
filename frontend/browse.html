@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Browse - LocalService Hub</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+<div id="nav"></div><div id="toast"></div>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <div><div class="page-title">Browse Providers</div><div class="text-muted">Find trusted professionals near you</div></div>
+  </div>
+
+  <!-- Search bar -->
+  <div class="card card-body" style="margin-bottom:1.25rem;display:flex;gap:.75rem;flex-wrap:wrap">
+    <input id="si" type="text" placeholder="Search name or service..." style="flex:1;min-width:180px"/>
+    <button class="btn btn-primary" onclick="render()"><i class="fas fa-search"></i> Search</button>
+  </div>
+
+  <!-- Category tabs -->
+  <div class="filter-tabs" id="tabs">
+    <button class="ftab active" data-cat="0">All</button>
+  </div>
+
+  <!-- Results -->
+  <p id="count" class="text-muted" style="margin-bottom:1rem"></p>
+  <div class="grid-3" id="grid">
+    <div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:2rem"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<footer>&copy; 2026 LocalService Hub</footer>
+<script src="js/app.js"></script>
+<script>
+const urlP = new URLSearchParams(location.search);
+let activeCat = parseInt(urlP.get('cat')) || 0;
+let allProviders = [];
+
+if (urlP.get('q')) document.getElementById('si').value = urlP.get('q');
+
+async function loadProviders() {
+  const res = await apiGet('providers.php', { action: 'list' });
+  if (!res.success) { toast('Failed to load providers', 'e'); return; }
+
+  allProviders = res.providers;
+
+  // Build category tabs
+  const tabs = document.getElementById('tabs');
+  Object.entries(res.categories).forEach(([id, c]) => {
+    const b = document.createElement('button');
+    b.className  = 'ftab' + (activeCat === parseInt(id) ? ' active' : '');
+    b.textContent = c.name;
+    b.dataset.cat = id;
+    b.onclick = () => {
+      activeCat = parseInt(id);
+      document.querySelectorAll('.ftab').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      render();
+    };
+    tabs.appendChild(b);
+  });
+
+  render();
+}
+
+document.getElementById('si').onkeydown = e => { if (e.key === 'Enter') render(); };
+document.querySelector('[data-cat="0"]').onclick = function() {
+  activeCat = 0;
+  document.querySelectorAll('.ftab').forEach(x => x.classList.remove('active'));
+  this.classList.add('active');
+  render();
+};
+
+function render() {
+  const q = document.getElementById('si').value.trim().toLowerCase();
+  let list = allProviders;
+  if (activeCat > 0) list = list.filter(p => parseInt(p.category_id) === activeCat);
+  if (q) list = list.filter(p =>
+    p.biz_name.toLowerCase().includes(q) ||
+    p.owner_name.toLowerCase().includes(q) ||
+    p.services.some(s => s.name.toLowerCase().includes(q))
+  );
+
+  document.getElementById('count').textContent = `${list.length} provider(s) found`;
+  const g = document.getElementById('grid');
+
+  if (!list.length) {
+    g.innerHTML = `<div class="card card-body" style="grid-column:1/-1;text-align:center;color:var(--muted);padding:3rem">
+      <i class="fas fa-search" style="font-size:2.5rem;display:block;margin-bottom:.75rem"></i>No providers found.</div>`;
+    return;
+  }
+
+  g.innerHTML = list.map(p => `
+  <div class="card hoverable">
+    <div class="card-body">
+      <div class="flex items-center" style="gap:.75rem;margin-bottom:.75rem">
+        <div class="avatar">${p.biz_name[0]}</div>
+        <div>
+          <div style="font-weight:600;font-size:.9rem">${p.biz_name}</div>
+          <div class="text-muted">${p.owner_name}</div>
+          <span style="font-size:.68rem;background:#dcfce7;color:#166534;padding:.1rem .45rem;border-radius:100px">✓ Verified</span>
+        </div>
+      </div>
+      <div style="margin-bottom:.6rem">${stars(p.rating)} <span class="text-muted">${p.rating}</span></div>
+      <div style="margin-bottom:.6rem">
+        <span class="chip">${p.category.name}</span>
+        ${p.services.slice(0, 2).map(s => `<span class="chip">${s.name}</span>`).join('')}
+      </div>
+      <div style="font-weight:600;color:var(--accent);margin-bottom:.6rem">From ${fmtPrice(p.price)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:.6rem;border-top:1px solid var(--border)">
+        <span class="text-muted">${p.experience} yrs exp</span>
+        <a href="booking.html?id=${p.id}" class="btn btn-sm btn-primary">Book Now</a>
+      </div>
+    </div>
+  </div>`).join('');
+}
+
+loadProviders();
+</script>
+</body>
+</html>
